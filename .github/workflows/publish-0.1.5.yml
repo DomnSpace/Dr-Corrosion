@@ -16,12 +16,12 @@ env:
   PRIVATE_SOURCE_SHA: af7b87bfb50943b77ce0cdbc59516a0fcf3131a9
   FUNCTIONAL_SHA: 03bbc5d2aa19c30e2cce551bab8ae8ac122dd2dd
   ARKADEON_SHA: 00baa4e0ac0aaafe70f711863beffaed02382427
+  AUDIO_STAGE_REF: release-015-sealed-audio
+  AUDIO_STAGE_ZIP: release-inputs/dr-corrosion-runtime-audio-0.1.5.zip
+  AUDIO_STAGE_ZIP_SHA256: e20dfed98177f4f8397bfa490e5bc24673d95c46f1b89989f636917a702aa596
   PUBLIC_BASE: https://domnspace.github.io/Dr-Corrosion
   R04_URL: https://domandsupply.com/dr-corrosion/assets/04/9f2c7e1d.pack
   R17_URL: https://domandsupply.com/dr-corrosion/assets/17/c84031a6.pack
-  THEME_WAV_URL: https://cdn1.suno.ai/1f1f8f03-066e-4fd0-89b4-9abc9f7ca092.wav
-  THEME_MASTER_BYTES: '77343792'
-  THEME_MASTER_SHA256: cbcfd794e9cfa38472281df3f75085d5e5e48f1ced54aed9a5daa721f8b4ecb2
 
 concurrency:
   group: dr-corrosion-public-0.1.5
@@ -32,10 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Require private-source read token
         env:
           PRIVATE_SOURCE_TOKEN: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
         run: test -n "$PRIVATE_SOURCE_TOKEN"
+
       - name: Checkout pinned private source
         uses: actions/checkout@v4
         with:
@@ -45,6 +47,17 @@ jobs:
           path: source
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Checkout sealed private runtime audio staging
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_SOURCE_REPO }}
+          ref: ${{ env.AUDIO_STAGE_REF }}
+          token: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
+          path: audio-stage
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Verify pinned source and release-only delta
         shell: bash
         run: |
@@ -59,8 +72,10 @@ jobs:
               *) echo "Unexpected post-acceptance source change: $path"; exit 1 ;;
             esac
           done
+
       - name: Install release validation dependencies
         run: python -m pip install --disable-pip-version-check pytest numpy netCDF4 pillow
+
       - name: Validate private release source
         shell: bash
         run: |
@@ -81,45 +96,57 @@ jobs:
           cmake --build build --config Release
           ctest --test-dir build --output-on-failure -C Release
           python -m labgraph native-check
+
       - name: Verify deployed Arkadeon shell
         run: cd source && python tools/check_hosted_arkadeon_shell.py
+
       - name: Materialize authenticated R04 release seed
         run: cd source && python tools/materialize_release_seed.py --r04-url "$R04_URL"
+
       - name: Verify canonical hosted R17
         run: cd source && python tools/check_hosted_r17.py "$R17_URL" --origin https://domnspace.github.io
-      - name: Fetch immutable author theme master
+
+      - name: Materialize exact sealed runtime audio
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf source/.release-master source/.release-audio
-          mkdir -p source/.release-master source/.release-audio
-          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output source/.release-master/theme.wav "$THEME_WAV_URL"
-          test "$(stat -c %s source/.release-master/theme.wav)" = "$THEME_MASTER_BYTES"
-          echo "$THEME_MASTER_SHA256  source/.release-master/theme.wav" | sha256sum -c -
-      - name: Reproduce exact sealed browser audio
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -v "$GITHUB_WORKSPACE/source:/repo" -w /repo debian:13-slim bash -lc '
-            set -euo pipefail
-            apt-get update -qq
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg python3 >/dev/null
-            python tools/reproduce_theme_runtime_audio.py --master .release-master/theme.wav --output-dir .release-audio
-          '
-          test "$(stat -c %s source/.release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.m4a)" = 6902360
-          test "$(stat -c %s source/.release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.opus)" = 5292011
+          ZIP="audio-stage/$AUDIO_STAGE_ZIP"
+          test -f "$ZIP"
+          echo "$AUDIO_STAGE_ZIP_SHA256  $ZIP" | sha256sum -c -
+
+          rm -rf source/.release-audio
+          mkdir -p source/.release-audio
+          unzip -q "$ZIP" -d source/.release-audio
+
+          M4A=source/.release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.m4a
+          OPUS=source/.release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.opus
+          test "$(stat -c %s "$M4A")" = 6902360
+          test "$(stat -c %s "$OPUS")" = 5292011
           echo '68e4497d20814b9c7be5e39c3d0052e6776e22d987dd42ba23878212284c0449  source/.release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.m4a' | sha256sum -c -
           echo '78f309b27ecc0d60c07970744df16c6046f952ea55571eff7661b7c198326746  source/.release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.opus' | sha256sum -c -
+          test "$(( $(stat -c %s "$M4A") + $(stat -c %s "$OPUS") ))" = 12194371
+
       - name: Build and reverify stable music-ready cartridge
         shell: bash
         run: |
           set -euo pipefail
           cd source
-          python tools/build_music_ready_release.py --version "$VERSION" --channel stable --output-dir dist-stable --index-url "$PUBLIC_BASE/stable/cartridge-index.json" --cartridge-url "$PUBLIC_BASE/stable/dr-corrosion.drc" --r17-url "$R17_URL" --r17-metadata-only --theme-audio .release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.m4a --theme-audio .release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.opus
+          python tools/build_music_ready_release.py \
+            --version "$VERSION" \
+            --channel stable \
+            --output-dir dist-stable \
+            --index-url "$PUBLIC_BASE/stable/cartridge-index.json" \
+            --cartridge-url "$PUBLIC_BASE/stable/dr-corrosion.drc" \
+            --r17-url "$R17_URL" \
+            --r17-metadata-only \
+            --theme-audio .release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.m4a \
+            --theme-audio .release-audio/dr-corrosion-alles-im-gruenen-bereich-0.1.5.opus
+
           python - <<'PY'
           import json, os, zipfile
           from pathlib import Path
           from tools.build_music_ready_release import verify_packaged_audio
+
           root = Path('dist-stable')
           drc = root / f"dr-corrosion-{os.environ['VERSION']}.drc"
           verified = verify_packaged_audio(drc)
@@ -127,11 +154,23 @@ jobs:
           with zipfile.ZipFile(drc, 'r') as archive:
               assert not any(name.lower().endswith('.wav') for name in archive.namelist())
               assert json.loads(archive.read('cartridge.json'))['version'] == os.environ['VERSION']
+
           info_path = root / 'build-info.json'
           info = json.loads(info_path.read_text(encoding='utf-8'))
-          info.update(source_commit=os.environ['PRIVATE_SOURCE_SHA'], functional_base_commit=os.environ['FUNCTIONAL_SHA'], arkadeon_host_commit=os.environ['ARKADEON_SHA'], distribution_repository=os.environ['GITHUB_REPOSITORY'], distribution_commit=os.environ['GITHUB_SHA'], promotion='public-stable-music-readiness', public_base=os.environ['PUBLIC_BASE'], runtime_audio_bytes_required=12194371)
+          info.update(
+              source_commit=os.environ['PRIVATE_SOURCE_SHA'],
+              functional_base_commit=os.environ['FUNCTIONAL_SHA'],
+              arkadeon_host_commit=os.environ['ARKADEON_SHA'],
+              distribution_repository=os.environ['GITHUB_REPOSITORY'],
+              distribution_commit=os.environ['GITHUB_SHA'],
+              promotion='public-stable-music-readiness',
+              public_base=os.environ['PUBLIC_BASE'],
+              runtime_audio_source='sealed-private-release-input',
+              runtime_audio_bytes_required=12194371,
+          )
           info_path.write_text(json.dumps(info, indent=2, sort_keys=True) + '\n', encoding='utf-8')
           PY
+
       - name: Stage public-only distribution files
         shell: bash
         run: |
@@ -148,6 +187,7 @@ jobs:
           cp release-assets/cartridge-index.json public/stable/cartridge-index.json
           cp release-assets/build-info.json public/stable/build-info.json
           touch public/.nojekyll
+
       - name: Publish or verify GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -158,14 +198,26 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             rm -rf .existing-release && mkdir .existing-release
             gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir .existing-release
-            for name in dr-corrosion.drc cartridge-index.json build-info.json RELEASE_NOTES_0.1.5.md; do cmp "release-assets/$name" ".existing-release/$name"; done
+            for name in dr-corrosion.drc cartridge-index.json build-info.json RELEASE_NOTES_0.1.5.md; do
+              cmp "release-assets/$name" ".existing-release/$name"
+            done
           else
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Dr. Corrosion $VERSION — Music-ready Level-1 demo" --notes-file RELEASE_NOTES_0.1.5.md release-assets/dr-corrosion.drc release-assets/cartridge-index.json release-assets/build-info.json release-assets/RELEASE_NOTES_0.1.5.md
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Dr. Corrosion $VERSION — Music-ready Level-1 demo" \
+              --notes-file RELEASE_NOTES_0.1.5.md \
+              release-assets/dr-corrosion.drc \
+              release-assets/cartridge-index.json \
+              release-assets/build-info.json \
+              release-assets/RELEASE_NOTES_0.1.5.md
           fi
+
       - name: Configure public Pages
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
       - name: Upload public install surface
         uses: actions/upload-pages-artifact@v4
         with:
