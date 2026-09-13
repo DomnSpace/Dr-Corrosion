@@ -1,0 +1,67 @@
+name: Deploy Dr. Corrosion Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-pages.yml
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dr-corrosion-pages
+  cancel-in-progress: false
+
+jobs:
+  build-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download sealed 0.1.5 public release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf release-assets public
+          mkdir -p release-assets public/stable
+          gh release download dr-corrosion-stable-v0.1.5 \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir release-assets \
+            --pattern dr-corrosion.drc \
+            --pattern cartridge-index.json \
+            --pattern build-info.json \
+            --pattern RELEASE_NOTES_0.1.5.md
+          cp site/index.html public/index.html
+          cp release-assets/RELEASE_NOTES_0.1.5.md public/RELEASE_NOTES_0.1.5.md
+          cp release-assets/dr-corrosion.drc public/stable/dr-corrosion.drc
+          cp release-assets/cartridge-index.json public/stable/cartridge-index.json
+          cp release-assets/build-info.json public/stable/build-info.json
+          touch public/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+  deploy-pages:
+    needs: build-pages
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy public install page and stable cartridge
+        id: deployment
+        uses: actions/deploy-pages@v4
