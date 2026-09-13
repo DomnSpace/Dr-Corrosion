@@ -13,7 +13,7 @@ permissions:
 env:
   VERSION: 0.1.5
   PRIVATE_SOURCE_REPO: DomnSpace/Dr.-Corrosion
-  PRIVATE_SOURCE_SHA: 63448451195b5f88a702ee2e0a9401bb3f051359
+  PRIVATE_SOURCE_SHA: af7b87bfb50943b77ce0cdbc59516a0fcf3131a9
   FUNCTIONAL_SHA: 03bbc5d2aa19c30e2cce551bab8ae8ac122dd2dd
   ARKADEON_SHA: 00baa4e0ac0aaafe70f711863beffaed02382427
   PUBLIC_BASE: https://domnspace.github.io/Dr-Corrosion
@@ -66,7 +66,7 @@ jobs:
           printf 'Release-only private-source delta:\n%s\n' "${CHANGED[*]}"
           for path in "${CHANGED[@]}"; do
             case "$path" in
-              docs/RELEASE_NOTES_0.1.5.md|packaging/arkadeon_cartridge.json|packaging/build_manifest.json|tests/test_theme_runtime_reproduction.py|tools/reproduce_theme_runtime_audio.py) ;;
+              docs/RELEASE_NOTES_0.1.5.md|packaging/arkadeon_cartridge.json|packaging/build_manifest.json|tests/test_theme_runtime_reproduction.py|tests/test_release_candidate.py|tools/reproduce_theme_runtime_audio.py) ;;
               *) echo "Unexpected post-acceptance source change: $path"; exit 1 ;;
             esac
           done
