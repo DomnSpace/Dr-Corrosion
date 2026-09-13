@@ -1,0 +1,101 @@
+name: Deploy canonical Dr. Corrosion site
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-real-site.yml
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dr-corrosion-pages
+  cancel-in-progress: false
+
+jobs:
+  build-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require private-source read token
+        env:
+          PRIVATE_SOURCE_TOKEN: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
+        run: test -n "$PRIVATE_SOURCE_TOKEN"
+
+      - name: Checkout canonical 0.1.5 download page
+        uses: actions/checkout@v4
+        with:
+          repository: DomnSpace/Dr.-Corrosion
+          ref: af7b87bfb50943b77ce0cdbc59516a0fcf3131a9
+          token: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
+          path: canonical
+          sparse-checkout: |
+            site
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assemble exact site with sealed public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf release-assets public
+          mkdir -p release-assets public/stable
+
+          # These are the exact presentation/interaction files from the accepted
+          # private 0.1.5 source. Keep the public landing page byte-identical to
+          # the real Dr. Corrosion download page instead of maintaining a clone.
+          cp canonical/site/index.html public/index.html
+          cp canonical/site/style.css public/style.css
+          cp canonical/site/portal.css public/portal.css
+          cp canonical/site/download.js public/download.js
+          cp canonical/site/feedback.js public/feedback.js
+
+          gh release download dr-corrosion-stable-v0.1.5 \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir release-assets \
+            --pattern dr-corrosion.drc \
+            --pattern cartridge-index.json \
+            --pattern build-info.json \
+            --pattern RELEASE_NOTES_0.1.5.md
+
+          cp release-assets/RELEASE_NOTES_0.1.5.md public/RELEASE_NOTES_0.1.5.md
+          cp release-assets/dr-corrosion.drc public/stable/dr-corrosion.drc
+          cp release-assets/cartridge-index.json public/stable/cartridge-index.json
+          cp release-assets/build-info.json public/stable/build-info.json
+          touch public/.nojekyll
+
+          # Fail closed if the rich page ever stops being the expected canonical
+          # page or if its live release binding disappears.
+          grep -Fq 'INSTITUTE FOR ECOLOGICAL MATERIAL DEGRADATION' public/index.html
+          grep -Fq 'DR. CORROSION / MATERIAL INVESTIGATION' public/index.html
+          grep -Fq 'Administrative notice 01/26' public/index.html
+          grep -Fq 'stable/cartridge-index.json' public/download.js
+          grep -Fq 'stable/build-info.json' public/download.js
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+  deploy-pages:
+    needs: build-pages
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy canonical download page and stable cartridge
+        id: deployment
+        uses: actions/deploy-pages@v4
