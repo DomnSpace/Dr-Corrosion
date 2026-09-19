@@ -1,0 +1,19 @@
+{
+  "schema": "dvx-update-index-v1",
+  "version": "1.0.0",
+  "dvx": {
+    "head": "91315536c288947e41a664747337202219d701cd",
+    "artifact": "dvx-update.json"
+  },
+  "project": {
+    "name": "POARI E-WFC",
+    "head": "5a4196abf5931a41a3d6528d134d2efdb6736e54",
+    "artifact": "poari-update.json"
+  },
+  "icon": "dvx-symbol.svg",
+  "auth": "none",
+  "fetch": {
+    "cache": "no-store",
+    "credentials": "omit"
+  }
+}
