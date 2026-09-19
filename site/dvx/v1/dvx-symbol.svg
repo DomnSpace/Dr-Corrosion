@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">DVX</title>
+  <desc id="desc">Teal DVX lettering over orange n-dimensional wireframe geometry.</desc>
+  <g fill="none" stroke="#ff8a1f" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M512 95 835 290 835 690 512 885 189 690 189 290Z"/>
+    <path d="M512 95V885M189 290 835 690M835 290 189 690"/>
+    <path d="M189 290 512 485 835 290M189 690 512 485 835 690"/>
+    <path d="M350 385 512 285 674 385 674 585 512 685 350 585Z"/>
+    <path d="M350 385 674 585M674 385 350 585M512 285V685"/>
+  </g>
+  <g fill="#ff9b2f">
+    <circle cx="512" cy="95" r="30"/><circle cx="835" cy="290" r="30"/><circle cx="835" cy="690" r="30"/>
+    <circle cx="512" cy="885" r="30"/><circle cx="189" cy="690" r="30"/><circle cx="189" cy="290" r="30"/>
+    <circle cx="512" cy="485" r="24"/><circle cx="512" cy="285" r="18"/><circle cx="512" cy="685" r="18"/>
+    <circle cx="350" cy="385" r="18"/><circle cx="674" cy="385" r="18"/><circle cx="350" cy="585" r="18"/><circle cx="674" cy="585" r="18"/>
+  </g>
+  <g fill="none" stroke="#24c7c7" stroke-width="72" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M225 365V660M225 365H335C414 365 458 425 458 512S414 660 335 660H225"/>
+    <path d="M485 365 590 660 695 365"/>
+    <path d="M730 365 875 660M875 365 730 660"/>
+  </g>
+</svg>
