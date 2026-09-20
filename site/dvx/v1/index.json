@@ -7,9 +7,9 @@
   },
   "project": {
     "name": "POARI E-WFC",
-    "version": "1.1.0-assimilation",
-    "head": "b76be86bc0d691afdf93683e921680e41c3d29d1",
-    "artifact": "poari-update.json"
+    "head": "6f6fa163108c92003ec77ea674f38f5ac6bf1e70",
+    "artifact": "poari-update.json",
+    "version": "1.1.0-backtest-infrastructure"
   },
   "icon": "dvx-symbol.svg",
   "auth": "none",
